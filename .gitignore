@@ -1,0 +1,12 @@
+original.pdf
+extracted/
+.mplconfig/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.spl
+*.synctex.gz
+.DS_Store
+__pycache__/
