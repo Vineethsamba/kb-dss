@@ -4,7 +4,7 @@ Repository: https://github.com/Vineethsamba/kb-dss
 
 Reproduction code for:
 
-**V. K. Samba**, “A Knowledge-Based AI Decision-Support Model for Predicting Digital Transformation Readiness From Enterprise Innovation Data.”
+**V. K. Samba**, “Measuring the Value of Expert Knowledge for Digital Transformation Readiness Prediction.”
 
 KB-DSS injects five expert pillars, six signed fuzzy IF–THEN rules, and an expert index into a gradient-boosting learner, and measures the value of that knowledge with a fidelity protocol.
 
@@ -15,15 +15,19 @@ python -m pip install -r requirements.txt
 python dtr.py
 ```
 
-This generates the synthetic benchmark of 2,000 firms (seed 42), runs every experiment, and writes:
+This generates the synthetic benchmark of 2,000 firms (seed 42), runs the confirmatory experiments, and writes:
 
-- `outputs/fig1.png` — framework
+- `outputs/fig1.png` — framework (also `figures/fig1.png`)
 - `outputs/fig2.png` — learning curves, fidelity map, permutation importance
-- `outputs/metrics.json` — Table 1, Table 2, and sweep metrics
+- `outputs/metrics.json` — Table 1, Table 2, sweep metrics, and the worked example
 
-Typical runtime is a few minutes on a laptop CPU. A self-test of the knowledge-layer invariants runs before every experiment.
+Typical runtime is a few minutes on a laptop CPU. A self-test of the knowledge-layer invariants runs before every experiment. The IEEE manuscript (`paper.tex` / `paper.pdf`) reports this run.
 
-The IEEE manuscript lives in `paper.tex` / `paper.pdf`. Tables in the manuscript are from the original study run; `python dtr.py` regenerates the same protocol with seed 42.
+Optional extra failure-mode sweep (not used in Tables 1–2):
+
+```bash
+python dtr.py --misspec-only
+```
 
 ## Real data
 

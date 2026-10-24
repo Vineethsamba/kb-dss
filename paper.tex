@@ -1,7 +1,11 @@
-\documentclass[journal]{IEEEtran}
+\documentclass[10pt,journal,compsoc]{IEEEtran}
 
 \usepackage[T1]{fontenc}
-\usepackage{cite}
+\ifCLASSOPTIONcompsoc
+  \usepackage[nocompress]{cite}
+\else
+  \usepackage{cite}
+\fi
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
 \usepackage{textcomp}
@@ -19,35 +23,38 @@
 
 \begin{document}
 
-\title{A Knowledge-Based AI Decision-Support Model for Predicting Digital Transformation Readiness From Enterprise Innovation Data}
+\title{Measuring the Value of Expert Knowledge for Digital Transformation Readiness Prediction}
 
 \author{Vineeth~Kumar~Samba%
-\thanks{Manuscript received 23 October 2026.}%
-\thanks{V. K. Samba is with SoftTechers LLC, Charlotte, NC 28262 USA
-(e-mail: vineethkumarsamba@gmail.com).}}
+\IEEEcompsocitemizethanks{\IEEEcompsocthanksitem V.~K. Samba is with SoftTechers LLC, Charlotte, NC 28262 USA.\protect\\
+E-mail: vineethkumarsamba@gmail.com.}%
+\thanks{Manuscript received 23 October 2026.}}
 
 \markboth{IEEE Transactions on Knowledge and Data Engineering,~Vol.~XX, No.~X, 2026}%
-{Samba: Knowledge-Based Decision Support for Digital Transformation Readiness}
+{Samba: Measuring the Value of Expert Knowledge for Readiness Prediction}
 
-\maketitle
-
+\IEEEtitleabstractindextext{%
 \begin{abstract}
-Predicting whether a firm is ready for digital transformation is a small-data problem: few organizations have labeled readiness outcomes, yet experts hold well-developed maturity models. This paper presents KB-DSS, a knowledge-based decision-support model that predicts three-level digital transformation readiness (DTR) from 12 enterprise innovation indicators, firm size, and sector. A knowledge layer encodes five expert pillars (data, technology, organization, governance, and innovation), six signed fuzzy IF--THEN rules, and a zero-training expert index. These knowledge features are appended to the raw inputs of a gradient-boosting learner, and every prediction is returned with a rule trace, the firm's two weakest pillars, and recommended actions. The central novelty is a knowledge-fidelity protocol that degrades the knowledge layer in controlled steps (fidelity \(\varphi\) from 1.0 to 0.0) and measures the value of knowledge as a function of both knowledge quality and training-set size. On a reproducible benchmark of 2000 synthetic firms, correct knowledge raised gradient-boosting Macro-F1 by 0.075 (95\% CI 0.059 to 0.091) with 60 training firms and by 0.022 (0.015 to 0.028) with 1500. The gain shrank as fidelity fell, and fully misspecified knowledge gave no gain beyond 60 firms. Under 15\% training-label noise, KB-DSS held Macro-F1 0.791 while plain boosting fell to 0.766. Under corrected \(5\times 3\) cross-validation at 1600 training firms, however, KB-DSS (0.803) did not differ significantly from plain boosting (\(+0.013\), 95\% CI \(-0.004\) to \(+0.031\)) or from logistic regression (0.810). The results therefore support a bounded claim: expert knowledge is most valuable when it is correct, data are scarce or labels are noisy, and its value can be measured before deployment.
+Few firms have labeled digital transformation readiness outcomes, yet experts already use maturity models. How much is that expert knowledge worth to a learner, and when does it stop helping? KB-DSS injects five expert pillars, six signed fuzzy IF--THEN rules, and a zero-training expert index into a gradient-boosting classifier of three-level readiness. With no public labeled firm dataset, experiments use a synthetic benchmark of 2000 firms in which the expert layer is only a partial model of the generator. Correct knowledge raised Macro-F1 over plain boosting by 0.032 (95\% CI 0.020 to 0.045) with 60 training firms; that gain stayed significant at every training size when the layer read the indicators correctly, and vanished when the layer was fully misspecified. Under 15\% label noise, KB-DSS reached Macro-F1 0.754 against 0.739 for plain boosting. At 1600 training firms, KB-DSS (0.784) beat boosting (+0.020, p=0.036) but lagged logistic regression (0.811). Fully aligned figures are an upper bound for a well-specified expert. Expert knowledge helps a tree learner when it is approximately correct; it is not a substitute for a linear model on this additive generator. The protocol does not yet show that KB-DSS predicts real-firm readiness.
 \end{abstract}
 
 \begin{IEEEkeywords}
 Decision support systems, digital transformation, explainable artificial intelligence, fuzzy systems, gradient boosting, informed machine learning, knowledge-based systems, small-sample learning.
-\end{IEEEkeywords}
+\end{IEEEkeywords}}
 
-\section{Introduction}
+\maketitle
+\IEEEdisplaynontitleabstractindextext
+\IEEEpeerreviewmaketitle
 
-Digital transformation changes how firms create value through data, platforms, and new organizational routines~\cite{vial2019}. Before committing capital, managers and entrepreneurs need to know whether their data, technology, people, governance, and innovation capability are ready. Practice answers this with digital maturity models, but a review of 22 such models found that their dimensions differ widely and that culture and transformational capability are often missing~\cite{teichert2019}; a 2026 review reaches a similar conclusion for the newer generation of models~\cite{stef2026}. Adoption research explains readiness through the technology--organization--environment (TOE) framework~\cite{tornatzky1990}. A systematic review of 106 studies of AI adoption in small and medium enterprises organizes the field along these lines~\cite{schwaeke2025}. These approaches are transparent but explanatory: they rank firms with expert-set weights and do not learn from outcome data.
+\IEEEraisesectionheading{\section{Introduction}\label{sec:introduction}}
 
-Two computational lines address readiness. Knowledge-driven systems encode expert judgment directly: fuzzy logic and the analytic hierarchy process have been used to assess digitalization barriers in 4531 SMEs~\cite{restrepo2024}, and a knowledge-based expert system evaluated digital supply-chain readiness~\cite{khan2021}. Data-driven systems learn from firm records: ensemble learners such as XGBoost and LightGBM predicted digital transformation of Chinese listed firms better than linear regression~\cite{chen2024}. The first line cannot correct its own weights; the second needs many labeled firms and returns a class without a reason a manager can act on~\cite{barredo2020}.
+\IEEEPARstart{D}{igital} transformation changes how firms create value through data, platforms, and new organizational routines~\cite{vial2019,verhoef2021}. It is not only IT-enabled process change: it can redefine the value proposition and organizational identity~\cite{vial2019,verhoef2021}. Before committing capital, managers need to know whether data, technology, people, governance, and innovation capability are ready. Digital-readiness constructs for resource-constrained firms have been specified and scaled in emerging-market SMEs~\cite{pingali2023}, and IEEE field studies show that entrepreneurial persistence, market sensing, IT infrastructure, skills, and existing production systems condition whether SMEs actually adopt digital tools~\cite{christofi2023,omrani2024,jung2023}. Practice still answers readiness mainly with digital maturity models. Reviews find that model dimensions differ widely and that culture and transformational capability are often missing~\cite{teichert2019,stef2026}; later assessments separate organizational from process maturity~\cite{tubis2023} and tailor multi-attribute scoring to SMEs~\cite{kljajic2021,kargas2023}. Adoption research explains the same factors through the technology--organization--environment (TOE) framework~\cite{tornatzky1990,omrani2024,badghish2024}. A systematic review of 106 studies of AI adoption in SMEs organizes the field along these lines~\cite{schwaeke2025}. These approaches are transparent but explanatory: they rank firms with expert-set weights and do not learn from labeled readiness outcomes.
 
-Informed machine learning proposes to integrate prior knowledge into the learning pipeline~\cite{vonrueden2023}, and recent work combines data- and knowledge-driven rules for classification~\cite{geng2024} or uses large language models to generate rule features for few-shot tabular learning~\cite{han2024}. One question is rarely measured directly, however: how much is the knowledge worth, and when? Expert models are never fully correct, and a knowledge layer that is wrong may add noise rather than signal. A decision-support system should therefore report not only its accuracy but also how its gain depends on the quality of the knowledge and on the amount of data available.
+Two computational lines address readiness. Knowledge-driven systems encode expert judgment in fuzzy and multi-criteria models: 2-tuple fuzzy AHP has been used to compute digital maturity for Spanish SMEs~\cite{marin2023}; spherical-fuzzy AHP to select transformation strategies~\cite{oner2024}; fuzzy logic to score digitalization barriers~\cite{restrepo2024}; and a knowledge-based expert system to evaluate digital supply-chain readiness~\cite{khan2021}. Meta-analytic evidence on smart-manufacturing adoption likewise stresses network, finance, and capability drivers rather than learned outcome models~\cite{kim2023sm}. Data-driven systems learn from firm records: ensembles such as XGBoost predicted digital transformation of Chinese listed firms better than linear regression~\cite{chen2024}, and AI-use patterns have been shown to vary with digital-maturity class~\cite{bratucu2024}. The first line cannot correct its own weights from outcomes; the second needs many labeled firms and, unless designed otherwise, returns a class without an inspectable reason~\cite{barredo2020,adadi2018}. Classical DSS research already required that recommendation systems remain auditable~\cite{shim2002}.
 
-This paper asks two research questions. RQ1: does a fuzzy-rule knowledge layer improve readiness prediction by a gradient-boosting learner, and under which data conditions? RQ2: how does that improvement change as the knowledge becomes less correct? The contribution is threefold: (i)~KB-DSS, a compact knowledge layer of five pillars, six signed fuzzy rules, and an expert index for DTR, coupled to a hybrid learner that returns rule-trace explanations; (ii)~a knowledge-fidelity protocol that degrades the knowledge layer in controlled steps and maps its value across fidelity and training-set size; and (iii)~a reproducible benchmark with five baselines, component ablation, label-noise stress tests, and corrected resampled statistics, released as a single script that also runs on real data.
+Informed machine learning proposes to put prior knowledge into the learning pipeline~\cite{vonrueden2023}. Recent work combines data- and knowledge-driven rules for hybrid classification~\cite{geng2024} or uses large language models to engineer features for few-shot tabular learning~\cite{han2024}. Fuzzy IF--THEN aggregation for complex decisions follows the min \(t\)-norm treatment of linguistic conjunction~\cite{zadeh1965,zadeh1973}. One question is rarely measured directly: how much is the knowledge worth, and when? Expert models are never fully correct, and a wrong knowledge layer may add noise. A decision-support system should therefore report not only accuracy but how its gain depends on knowledge quality and on sample size.
+
+This paper asks two research questions. RQ1: does a fuzzy-rule knowledge layer improve readiness prediction by a gradient-boosting learner, and under which data conditions? RQ2: how does that improvement change as the knowledge becomes less correct, including failure modes other than reading the wrong indicators? The contribution is threefold: (i)~a knowledge-fidelity protocol that degrades an expert layer by indicator permutation, rule-sign reversal, weight noise, and rule deletion, and reports gain as a function of knowledge quality and training-set size; (ii)~KB-DSS, a compact knowledge layer of five pillars, six signed fuzzy rules, and an expert index, concatenated with raw inputs of a gradient-boosting learner that can emit an inspectable rule trace (not evaluated with users); and (iii)~a reproducible synthetic benchmark with five baselines, ablation, label-noise tests, and corrected resampled statistics. No public DTR-labeled firm dataset is used; the script accepts real data through \verb|--data| when such a file exists. All \(\varphi=1.0\) results are an upper bound for an expert whose rules partly match the data-generating process.
 
 \section{Proposed KB-DSS Framework}
 
@@ -66,7 +73,7 @@ A firm is described by \(\mathbf{x}=(x_1,\ldots,x_{12})\in[0,1]^{12}\): data mat
 
 \subsection{Knowledge Layer}
 
-Five expert pillars summarize the indicators, following the dimensions shared by maturity models~\cite{teichert2019} and the TOE framework~\cite{tornatzky1990}. Each pillar \(k\) has a set of indicators \(J_k\) with signed expert weights \(w_{kj}\), and its score is a weighted mean in \([0,1]\):
+Five expert pillars summarize the indicators, following dimensions shared by maturity models~\cite{teichert2019,tubis2023,kljajic2021} and the TOE framework~\cite{tornatzky1990,omrani2024}. Each pillar \(k\) has a set of indicators \(J_k\) with signed expert weights \(w_{kj}\), and its score is a weighted mean in \([0,1]\):
 \begin{equation}
 P_k(\mathbf{x})
 =
@@ -82,7 +89,7 @@ x_j, & w_{kj}>0,\\
 \end{equation}
 The pillars are Data (data maturity 0.5, analytics capability 0.5), Technology (AI adoption 0.35, cloud adoption 0.35, legacy debt \(-0.30\)), Organization (leadership commitment 0.5, digital skills 0.5), Governance (data governance 1.0), and Innovation (R\&D intensity 0.30, innovation output 0.35, entrepreneurial orientation 0.35).
 
-Six signed fuzzy IF--THEN rules capture interactions that a weighted sum cannot. Each rule \(r\) has an antecedent of literals \(\ell\) (an indicator or its complement) combined with the minimum \(t\)-norm as fuzzy AND~\cite{zadeh1965}, and a sign \(s_r\in\{+1,-1\}\) for its expert effect on readiness:
+Six signed fuzzy IF--THEN rules capture interactions that a weighted sum cannot. Each rule \(r\) has an antecedent of literals \(\ell\) (an indicator or its complement) combined with the minimum \(t\)-norm as fuzzy AND~\cite{zadeh1965,zadeh1973}, and a sign \(s_r\in\{+1,-1\}\) for its expert effect on readiness:
 \begin{equation}
 \mu_r(\mathbf{x})
 =
@@ -125,7 +132,7 @@ where \(f\) is a histogram gradient-boosting classifier~\cite{friedman2001,pedre
 
 \subsection{Explanation and Recommendation}
 
-For any firm, KB-DSS returns the predicted class and probabilities, the two lowest pillar scores, every rule with activation \(\mu_r>0.4\) and its sign, and one recommended action for each weak pillar and each fired negative rule. Explanations come from the additive structure of~\eqref{eq:pillar}--\eqref{eq:index}, not from a post-hoc approximation of the learner~\cite{barredo2020}. Algorithm~\ref{alg:kbdss} summarizes the procedure.
+For any firm, KB-DSS returns the predicted class and probabilities, the two lowest pillar scores, every rule with activation \(\mu_r>0.4\) and its sign, and one recommended action for each weak pillar and each fired negative rule. Explanations come from the additive structure of~\eqref{eq:pillar}--\eqref{eq:index}, not from a post-hoc approximation of the learner~\cite{barredo2020,adadi2018}. Algorithm~\ref{alg:kbdss} summarizes the procedure. This follows the DSS requirement that advice remain inspectable~\cite{shim2002}; we do not claim a user evaluation of the trace.
 
 \begin{algorithm}[t]
 \caption{KB-DSS Readiness Prediction and Explanation}
@@ -166,7 +173,7 @@ To measure what the knowledge is worth, the knowledge layer is degraded in contr
 \label{eq:fidelity}
 \end{equation}
 where \(\Pi_{0.0}\) moves all 12 indicators.
-The learner always sees the correct raw inputs; only the expert layer is wrong. At \(\varphi=0\) the pillars and rules still aggregate real indicators, but in the wrong roles. This separates the value of correct domain structure from the generic value of adding aggregate features.
+The learner always sees the correct raw inputs; only the expert layer is wrong. At \(\varphi=0\) the pillars and rules still aggregate real indicators, but in the wrong roles. This separates the value of correct domain structure from the generic value of adding aggregate features. Indicator permutation is only one model of error. We therefore also (i)~flip three or all six rule signs, (ii)~add Gaussian noise to pillar and index weights, and (iii)~drop either the four rules that share the generator's interaction form (\(R_1,R_2,R_3,R_5\)) or the two rules that do not (\(R_4,R_6\)). These operators test an expert who reverses effects, miscalibrates weights, or omits structure.
 
 \subsection{Evaluation Protocol and Statistics}
 
@@ -187,7 +194,7 @@ where \(\bar{d}\) and \(s_d^2\) are the mean and variance of the per-fold differ
 
 \subsection{Performance With Ample Data}
 
-With 1600 training firms, KB-DSS reached Macro-F1 0.803 and QWK 0.827, above plain gradient boosting (0.790), the random forest (0.790), and the expert index (0.782), and below logistic regression (0.810) and KB-LR (0.811) (Table~\ref{tab:models}). None of these differences is significant under the corrected test. The gain over plain boosting is \(+0.013\) (95\% CI \(-0.004\) to \(+0.031\), \(p=0.130\)). A naive paired Wilcoxon test on the same 15 folds gives \(p=0.005\) for this comparison, which shows how far overlapping folds can overstate significance~\cite{nadeau2003,demsar2006}. Logistic regression is competitive because the latent score is mostly additive; adding knowledge features to it changes Macro-F1 by only 0.001.
+With 1600 training firms, KB-DSS is a better tree model than raw gradient boosting, but it is not the most accurate classifier on this additive generator. It reached Macro-F1 0.784 and QWK 0.807, above plain gradient boosting (0.763) and the expert index (0.640), and below logistic regression (0.811) and KB-LR (0.813) (Table~\ref{tab:models}). The gain over boosting is \(+0.020\) (95\% CI \(0.003\) to \(0.038\), \(p=0.036\)). A naive paired Wilcoxon test on the same 15 folds gives \(p<0.001\), which shows how far overlapping folds can overstate significance~\cite{nadeau2003,demsar2006}. Logistic regression is strongest because the latent score is mostly a weighted sum; adding knowledge features to it changes Macro-F1 by only 0.002. The contribution of KB-DSS is therefore not large-sample accuracy relative to a linear model. It is a measurable gain for a tree learner, plus an inspectable trace.
 
 \begin{table*}[!t]
 \caption{Model Comparison Under Repeated Stratified Cross-Validation (2000 Firms, 1600 Training Firms Per Fold)}
@@ -200,17 +207,17 @@ With 1600 training firms, KB-DSS reached Macro-F1 0.803 and QWK 0.827, above pla
 Model & Accuracy & Macro-F1 & QWK & Gain vs row [95\% CI] & \(p\) \\
 \midrule
 Expert index (zero training)
-  & \(0.776\pm0.018\) & \(0.782\pm0.018\) & \(0.813\pm0.016\) & \(+0.021\) [\(-0.002\), \(+0.044\)] & 0.074 \\
+  & \(0.632\pm0.032\) & \(0.640\pm0.031\) & \(0.659\pm0.031\) & \(+0.144\) [\(+0.116\), \(+0.172\)] & \(<0.001\) \\
 Logistic regression
-  & \(0.805\pm0.022\) & \(0.810\pm0.021\) & \(0.835\pm0.019\) & \(-0.007\) [\(-0.024\), \(+0.009\)] & 0.350 \\
+  & \(0.805\pm0.025\) & \(0.811\pm0.024\) & \(0.835\pm0.022\) & \(-0.027\) [\(-0.046\), \(-0.008\)] & 0.013 \\
 Random forest
-  & \(0.784\pm0.020\) & \(0.790\pm0.020\) & \(0.812\pm0.018\) & \(+0.013\) [\(-0.004\), \(+0.030\)] & 0.134 \\
+  & \(0.728\pm0.030\) & \(0.734\pm0.029\) & \(0.750\pm0.029\) & \(+0.050\) [\(+0.029\), \(+0.070\)] & \(<0.001\) \\
 Gradient boosting
-  & \(0.784\pm0.022\) & \(0.790\pm0.021\) & \(0.816\pm0.019\) & \(+0.013\) [\(-0.004\), \(+0.031\)] & 0.130 \\
+  & \(0.757\pm0.029\) & \(0.763\pm0.029\) & \(0.783\pm0.029\) & \(+0.020\) [\(+0.003\), \(+0.038\)] & 0.036 \\
 KB-LR (logistic + knowledge)
-  & \(0.806\pm0.023\) & \(0.811\pm0.022\) & \(0.836\pm0.019\) & \(-0.008\) [\(-0.026\), \(+0.010\)] & 0.358 \\
+  & \(0.808\pm0.026\) & \(0.813\pm0.025\) & \(0.837\pm0.023\) & \(-0.029\) [\(-0.048\), \(-0.011\)] & 0.008 \\
 KB-DSS (proposed)
-  & \(0.797\pm0.022\) & \(0.803\pm0.022\) & \(0.827\pm0.017\) & --- & --- \\
+  & \(0.778\pm0.022\) & \(0.784\pm0.022\) & \(0.807\pm0.023\) & --- & --- \\
 \bottomrule
 \end{tabular*}
 \vspace{2pt}
@@ -220,7 +227,7 @@ KB-DSS (proposed)
 
 \subsection{Component Ablation and Stress Tests}
 
-Each knowledge component raised the Macro-F1 of gradient boosting (Table~\ref{tab:ablation}): pillars by 0.004, rules by 0.010, and the expert index by 0.020, the only interval that excludes zero. The full layer added 0.013. The index-only variant was better than the full layer in this run; it was found after the fact, so it is reported as an observation and was not used to choose the proposed model. Two stress tests isolate what the knowledge contributes. When all 12 indicators were permuted before the knowledge layer read them, the gain vanished (\(+0.000\), 95\% CI \(-0.011\) to \(+0.011\)). The benefit therefore comes from correct expert structure, not from extra features as such. When 15\% of training labels were corrupted, plain boosting lost 0.024 Macro-F1 (95\% CI \(-0.041\) to \(-0.007\)), while KB-DSS held 0.791, essentially the clean baseline (\(+0.002\)). Expert features act as a label-independent anchor that noisy labels cannot shift.
+Each knowledge component raised the Macro-F1 of gradient boosting (Table~\ref{tab:ablation}): pillars by 0.011, rules by 0.006, and the expert index by 0.019, the only single-component interval that excludes zero. The full layer added 0.020 (\(p=0.036\)). The index-only variant is statistically indistinguishable from the full layer in this run; it was found after the fact, so it is reported as an observation and was not used to choose the proposed model. Two stress tests isolate what the knowledge contributes. When all 12 indicators were permuted before the knowledge layer read them, the gain was consistent with zero (\(+0.005\), 95\% CI \(-0.015\) to \(+0.026\)). The benefit therefore comes from correct expert structure, not from extra features as such. When 15\% of training labels were corrupted, plain boosting lost 0.024 Macro-F1 (95\% CI \(-0.044\) to \(-0.004\)) to 0.739, while KB-DSS fell only to 0.754 (\(-0.010\) vs the clean boosting baseline, interval includes zero). Expert features therefore buffer a tree learner against label noise; they do not restore clean-label accuracy.
 
 \begin{table*}[!t]
 \caption{Component Ablation and Stress Tests for Gradient Boosting}
@@ -233,35 +240,37 @@ Each knowledge component raised the Macro-F1 of gradient boosting (Table~\ref{ta
 Variant & Macro-F1 & QWK & \(\Delta\) Macro-F1 vs raw [95\% CI] \\
 \midrule
 Raw features only (no knowledge)
-  & \(0.790\pm0.021\) & \(0.816\pm0.019\) & --- \\
+  & \(0.763\pm0.029\) & \(0.783\pm0.029\) & --- \\
 \(+\) pillar scores only
-  & \(0.794\pm0.019\) & \(0.820\pm0.016\) & \(+0.004\) [\(-0.012\), \(+0.020\)] \\
+  & \(0.775\pm0.026\) & \(0.797\pm0.026\) & \(+0.011\) [\(-0.007\), \(+0.030\)] \\
 \(+\) fuzzy rules only
-  & \(0.800\pm0.020\) & \(0.825\pm0.017\) & \(+0.010\) [\(-0.003\), \(+0.024\)] \\
+  & \(0.769\pm0.029\) & \(0.792\pm0.029\) & \(+0.006\) [\(-0.010\), \(+0.021\)] \\
 \(+\) expert index only
-  & \(0.810\pm0.023\) & \(0.834\pm0.018\) & \(+0.020\) [\(+0.001\), \(+0.039\)] \\
+  & \(0.782\pm0.027\) & \(0.806\pm0.027\) & \(+0.019\) [\(+0.005\), \(+0.032\)] \\
 Full KB-DSS (pillars + rules + index)
-  & \(0.803\pm0.022\) & \(0.827\pm0.017\) & \(+0.013\) [\(-0.004\), \(+0.031\)] \\
+  & \(0.784\pm0.022\) & \(0.807\pm0.023\) & \(+0.020\) [\(+0.003\), \(+0.038\)] \\
 Stress: fully misspecified knowledge (\(\varphi=0\))
-  & \(0.790\pm0.020\) & \(0.816\pm0.018\) & \(+0.000\) [\(-0.011\), \(+0.011\)] \\
+  & \(0.769\pm0.031\) & \(0.792\pm0.030\) & \(+0.005\) [\(-0.015\), \(+0.026\)] \\
 Stress: 15\% label noise, raw features
-  & \(0.766\pm0.022\) & \(0.792\pm0.019\) & \(-0.024\) [\(-0.041\), \(-0.007\)] \\
+  & \(0.739\pm0.026\) & \(0.760\pm0.028\) & \(-0.024\) [\(-0.044\), \(-0.004\)] \\
 Stress: 15\% label noise, full KB-DSS
-  & \(0.791\pm0.017\) & \(0.815\pm0.016\) & \(+0.002\) [\(-0.011\), \(+0.014\)] \\
+  & \(0.754\pm0.024\) & \(0.772\pm0.023\) & \(-0.010\) [\(-0.036\), \(+0.017\)] \\
 \bottomrule
 \end{tabular*}
 \vspace{2pt}
 
-{\raggedright\scriptsize Same 15 folds as Table~\ref{tab:models}. \(\Delta\) is the change in Macro-F1 relative to raw gradient boosting trained on clean labels (0.790), with a Nadeau--Bengio corrected 95\% CI.\par}
+{\raggedright\scriptsize Same 15 folds as Table~\ref{tab:models}. \(\Delta\) is the change in Macro-F1 relative to raw gradient boosting trained on clean labels (0.763), with a Nadeau--Bengio corrected 95\% CI.\par}
 \end{table*}
 
 \subsection{When Knowledge Pays: Data Scarcity and Knowledge Fidelity}
 
-The value of knowledge depends on how much data there is [Fig.~\ref{fig:results}(a)]. With 60 training firms, KB-DSS reached Macro-F1 0.703 against 0.628 for plain boosting; with 120 firms, 0.759 against 0.695. The zero-training expert index scored 0.768 at 60 firms, above every learned model in the curve. Logistic regression overtook it at 240 firms (0.784 against 0.777) and KB-DSS at 480 firms (0.783 against 0.775).
+The value of knowledge depends on how much data there is [Fig.~\ref{fig:results}(a)]. With 60 training firms, KB-DSS reached Macro-F1 0.607 against 0.575 for plain boosting; with 120 firms, 0.660 against 0.633. Logistic regression was strongest at every size on the curve (0.684 at 60 firms, 0.808 at 1500). The zero-training expert index stayed near 0.63 and did not compete with a fitted linear model. KB-DSS closed on boosting as \(n\) grew (0.785 against 0.760 at 1500 firms) but did not catch logistic regression.
 
-The fidelity map [Fig.~\ref{fig:results}(b)] answers RQ2. With correct knowledge (\(\varphi=1.0\)), the gain over plain boosting was significant at every training size, from 0.075 (95\% CI 0.059 to 0.091) at 60 firms to 0.022 (0.015 to 0.028) at 1500. The gain shrank as fidelity fell: at 60 firms it was 0.055 at \(\varphi=0.75\), 0.042 at \(\varphi=0.50\), and 0.023 at \(\varphi=0.25\). Beyond 120 firms, knowledge with \(\varphi\leq 0.25\) gave no significant gain, and at 960 and 1500 firms it was slightly negative (\(-0.001\) to \(-0.004\)). Fully misspecified knowledge still helped at 60 firms (\(+0.029\)), because averaging any real indicators reduces variance when data are very scarce. Subtracting that generic effect, the value of correct domain structure (\(\varphi=1.0\) minus \(\varphi=0.0\)) was 0.046 at 60 firms, 0.055 at 120, 0.036 at 240, and 0.017 to 0.026 from 480 to 1500 firms. Correct structure is therefore worth most at 60 to 240 firms, the scale of a typical survey of innovative firms, and wrong knowledge does little harm once data grow.
+The fidelity map [Fig.~\ref{fig:results}(b)] answers RQ2. With correct knowledge (\(\varphi=1.0\)), the gain over plain boosting was significant at every training size, from 0.032 (95\% CI 0.020 to 0.045) at 60 firms to 0.025 (0.015 to 0.034) at 1500. The gain collapsed as soon as indicators were permuted: at \(\varphi=0.75\) the 60-firm interval already included zero (\(+0.012\), \(-0.012\) to \(+0.035\)), and several cells at \(\varphi\leq 0.50\) were significantly negative. Fully misspecified knowledge (\(\varphi=0\)) was indistinguishable from raw boosting at every size (e.g.\ \(+0.000\) at 60 firms, 95\% CI \(-0.012\) to \(+0.012\)). Subtracting that generic effect, the value of correct domain structure (\(\varphi=1.0\) minus \(\varphi=0.0\)) was 0.032 at 60 firms, 0.025 at 120, 0.032 at 240, and 0.018 to 0.025 from 480 to 1500 firms. Wrong knowledge is therefore not harmless: it can erase the tree-learner gain and, at intermediate fidelity, can hurt.
 
-The sweep reports a significant \(+0.022\) at 1500 firms, whereas Table~\ref{tab:models} finds \(+0.013\) nonsignificant at 1600. The two use different estimators: the sweep's intervals are plain \(t\)-intervals over 12 splits whose training pools overlap, so they are narrower than the corrected intervals of Table~\ref{tab:models}. Table~\ref{tab:models} is the conservative reference for the large-data comparison.
+The sweep at 1500 firms (\(+\hspace{0pt}0.025\), uncorrected) agrees in sign with the corrected Table~\ref{tab:models} gain at 1600 (\(+\hspace{0pt}0.020\), \(p=0.036\)). The sweep intervals are still plain \(t\)-intervals over 12 overlapping training pools, so Table~\ref{tab:models} remains the conservative large-data reference.
+
+Sign reversal, weight noise, and rule deletion are implemented in the released script (\verb|--misspec-only|) so that the protocol is not limited to indicator permutation. Those extra operators are optional diagnostics; they are not pooled with Tables~\ref{tab:models}--\ref{tab:ablation} or Fig.~\ref{fig:results}.
 
 \begin{figure*}[!t]
 \centering
@@ -272,32 +281,34 @@ The sweep reports a significant \(+0.022\) at 1500 firms, whereas Table~\ref{tab
 
 \subsection{What the Model Uses and How It Explains}
 
-Permutation importance shows that KB-DSS relies mainly on the knowledge-compressed signal [Fig.~\ref{fig:results}(c)]. Shuffling the expert index lowered Macro-F1 by 0.267, against 0.020 for cloud adoption, 0.017 for sector, and 0.010 for legacy debt, the strongest raw inputs. This pattern is consistent with the learner using raw indicators to correct the expert model where it is incomplete: cloud adoption, sector, and firm size are the inputs to the cloud-by-size interaction and sector effects that no rule encodes. For one held-out firm, KB-DSS predicted Medium readiness (probability 0.834) and reported Innovation and Data as the weakest pillars. It flagged the legacy barrier (\(R_3\), activation 0.50) and analytics without a base (\(R_6\), 0.46) as negative rules, alongside data--AI synergy (\(R_1\), 0.45) as a positive one. Its recommended actions were to strengthen innovation and data first and to mitigate legacy debt with low cloud adoption. Each element of this output traces to a named pillar or rule, which a plain classifier cannot provide.
+Permutation importance shows that KB-DSS relies on both the knowledge-compressed signal and the generator terms that no rule encodes [Fig.~\ref{fig:results}(c)]. Shuffling the expert index lowered Macro-F1 by 0.150, followed by log firm size (0.123) and sector (0.072); the Technology pillar (0.031) and regulatory intensity (0.031) came next. Size and sector are exactly the inputs to the cloud-by-size interaction and sector effects that no rule encodes, so the tree uses raw features to correct an incomplete expert model. For one held-out firm, KB-DSS predicted Low readiness (probability 0.884) and reported Organization and Technology as the weakest pillars. It flagged the legacy barrier (\(R_3\), activation 0.44) and analytics without a base (\(R_6\), 0.46) as negative rules, alongside the innovation engine (\(R_5\), 0.51) as a positive one. Recommended actions pointed to those pillars and to the fired negative rules. This is a worked example of inspectability: every element traces to a named pillar or rule. It is not a user study; we do not claim that managers find the trace more useful than a plain score.
 
 \subsection{Implications for Decision Support}
 
-The results suggest a simple deployment rule. Below about 150 labeled firms, start from the expert index or KB-DSS. With several hundred firms, a regularized linear model is as accurate, and the knowledge layer remains useful for explanation and as insurance against noisy labels. The fidelity protocol itself is a practical tool: before deployment, a team can degrade its own rule base and check whether the measured gain behaves like the \(\varphi=1.0\) row of Fig.~\ref{fig:results}(b) or like the \(\varphi=0.0\) row.
+On this benchmark the practical rule is: if the data-generating process is close to additive, start with regularized logistic regression; use KB-DSS when the deployed learner is a tree ensemble that should beat raw boosting, remain somewhat robust to label noise, and emit an inspectable pillar/rule trace. Teams can apply the fidelity and misspecification operators in the released script to their own rule base and see whether the gain looks like the \(\varphi=1.0\) row of Fig.~\ref{fig:results}(b) or like a broken layer. This is a pre-deployment diagnostic, not evidence that the present weights travel to real firms.
 
 \FloatBarrier
 \section{Limitations}
 
-The benchmark is synthetic. This makes the study transparent and exactly reproducible, but it does not show that KB-DSS predicts the readiness of real firms. Four of the six rules share their functional form with terms in the generator, so the \(\varphi=1.0\) results are an upper bound for a well-specified expert model; the fidelity protocol was introduced precisely to show how the gain falls when that assumption fails. Validation on real enterprise survey or platform data, which the script accepts through its \verb|--data| option, is the main open task.
+The benchmark is synthetic. That is a design choice for identifiability, not a substitute for field data. Low/Medium/High labels are percentiles of a latent score we control; they are not scores from a validated DTR instrument. Four of the six rules share their functional form with the generator, so \(\varphi=1.0\) is an upper bound. Additional misspecification operators in the code do not estimate the fidelity of real practitioners. The study therefore does not show that KB-DSS predicts the readiness of real firms.
 
-The expert weights and rules were set by the author from maturity-model and TOE logic rather than elicited from a panel. A Delphi or AHP elicitation would make the knowledge layer more defensible and would allow the fidelity of real expert knowledge to be estimated. The fidelity operator permutes indicators, which models an expert who attends to the wrong evidence; other failure modes, such as wrong rule signs or miscalibrated weights, are not tested.
+The weights and rules were set by the author from maturity-model and TOE logic. A Delphi or AHP panel of even five to eight practitioners would make the layer defensible and would yield an empirical \(\varphi_{\mathrm{real}}\) from disagreement with the base rules. Rule traces are inspectable by construction; we did not measure whether managers trust or use them. Hyperparameters were fixed for all models. Readiness is a cross-section; a process view needs panel data.
 
-The Table~\ref{tab:models} and Table~\ref{tab:ablation} comparisons use corrected resampled tests, but the sweep intervals in Fig.~\ref{fig:results}(b) are uncorrected and therefore optimistic, as discussed in Section~IV-C. Hyperparameters were fixed and not tuned for any model, which favors no method but may understate the best attainable accuracy of each. Finally, readiness is measured at one point in time; transformation is a process, and a longitudinal formulation would require panel data.
+A minimum real-data follow-up is a survey of about 100--150 firms with the 12 indicators (or a documented subset), a manager-rated readiness label such as the digital-readiness construct of~\cite{pingali2023}, and the same CV and fidelity/misspecification protocol. The released script already accepts that file.
+
+The Table~\ref{tab:models} and Table~\ref{tab:ablation} tests are Nadeau--Bengio corrected; the fidelity-map intervals in Fig.~\ref{fig:results}(b) are uncorrected and therefore optimistic.
 
 \section{Conclusion}
 
-This paper presented KB-DSS, a knowledge-based decision-support model that predicts digital transformation readiness from enterprise innovation data by injecting five expert pillars, six signed fuzzy rules, and an expert index into a gradient-boosting learner. Its main contribution is a knowledge-fidelity protocol that measures what expert knowledge is worth. On a reproducible benchmark, correct knowledge lifted Macro-F1 by 0.075 with 60 training firms and by 0.022 with 1500. The gain fell as knowledge fidelity fell, and fully misspecified knowledge added nothing beyond 60 firms. Knowledge also absorbed the full effect of 15\% label noise. With 1600 training firms, no corrected difference from plain boosting or logistic regression was significant. For entrepreneurs and innovation managers, who typically have few labeled cases and strong domain heuristics, the evidence supports using expert knowledge as an explicit, auditable, and testable input to AI-based readiness decisions.
+This paper's contribution is a protocol for measuring what expert knowledge is worth in a small-data readiness classifier, instantiated as KB-DSS. On a controlled synthetic benchmark, correct knowledge raised a gradient-boosting learner over raw features at every training size we tested and buffered 15\% label noise; permuting the indicators erased that gain; and a regularized linear model still won on accuracy because the generator is mostly additive. Those \(\varphi=1.0\) numbers bound a well-aligned expert, not a field deployment. Until the protocol is rerun on survey or platform data with elicited rules, KB-DSS should be read as a diagnostic for knowledge value, not as a predictor of real-firm digital transformation readiness.
 
 \section*{Data and Code Availability}
 
-The data are synthetic and fully reproducible. The single script \texttt{dtr.py} generates the benchmark, runs every experiment, and writes Fig.~\ref{fig:framework}, Fig.~\ref{fig:results}, Table~\ref{tab:models}, Table~\ref{tab:ablation}, and a metrics file with fixed random seeds. It is available at \url{https://github.com/Vineethsamba/kb-dss}. Running \texttt{python dtr.py} reproduces all reported numbers in about five minutes on a laptop CPU, and \verb|python dtr.py --data firms.csv| applies the same study to real data with the documented schema.
+The benchmark is synthetic. Protocol, generator, and experiment code are in \texttt{dtr.py} at \url{https://github.com/Vineethsamba/kb-dss} (seed 42). Tables~\ref{tab:models}--\ref{tab:ablation} and Fig.~\ref{fig:results} are the output of \texttt{python dtr.py} from that script. The option \verb|python dtr.py --data firms.csv| applies the same study to real data with the documented schema. Extra misspecification operators are available with \verb|--misspec-only|.
 
 \section*{Acknowledgment}
 
-During preparation of this manuscript, AI-assisted tools were used for code development, language drafting, editing, and formatting. The author reviewed and edited the content and takes full responsibility for the manuscript. All experimental results, tables, and figures were generated by the executable code described in the Data and Code Availability statement. The author declares no competing financial interests.
+During preparation of this manuscript, AI-assisted tools were used for code development, language drafting, editing, and formatting. The author reviewed and edited the content and takes full responsibility for the manuscript. The author takes responsibility for the confirmatory numbers in Tables~\ref{tab:models}--\ref{tab:ablation} and Fig.~\ref{fig:results}. The author declares no competing financial interests.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

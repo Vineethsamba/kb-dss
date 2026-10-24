@@ -130,17 +130,70 @@ def rule_activations(x: np.ndarray) -> np.ndarray:
     return mu
 
 
-def expert_index(p: np.ndarray, mu: np.ndarray) -> np.ndarray:
-    signs = np.array([s for _, s, _ in RULES], dtype=float)
-    return p @ OMEGA + (LAMBDA / 6.0) * (mu * signs).sum(axis=1)
+def expert_index(p: np.ndarray, mu: np.ndarray, signs=None, omega=None) -> np.ndarray:
+    signs = np.array([s for _, s, _ in RULES], dtype=float) if signs is None else np.asarray(signs, dtype=float)
+    omega = OMEGA if omega is None else np.asarray(omega, dtype=float)
+    return p @ omega + (LAMBDA / 6.0) * (mu * signs).sum(axis=1)
 
 
-def kappa(x: np.ndarray) -> np.ndarray:
+def pillar_scores_spec(x: np.ndarray, spec) -> np.ndarray:
+    n = x.shape[0]
+    p = np.zeros((n, len(spec)))
+    for k, (_, terms) in enumerate(spec):
+        num = np.zeros(n)
+        den = 0.0
+        for j, w in terms:
+            if abs(w) < 1e-12:
+                continue
+            xt = x[:, j] if w > 0 else 1.0 - x[:, j]
+            num += abs(w) * xt
+            den += abs(w)
+        p[:, k] = num / den if den > 0 else 0.5
+    return p
+
+
+def kappa(x: np.ndarray, layer: dict | None = None) -> np.ndarray:
     x = np.clip(np.asarray(x, dtype=float), 0.0, 1.0)
-    p = pillar_scores(x)
+    spec = PILLAR_SPEC if layer is None else layer.get("spec", PILLAR_SPEC)
+    signs = None if layer is None else layer.get("signs")
+    omega = None if layer is None else layer.get("omega")
+    drop = set() if layer is None else set(layer.get("drop", ()))
+    p = pillar_scores_spec(x, spec)
     mu = rule_activations(x)
-    e = expert_index(p, mu)
+    if drop:
+        mu = mu.copy()
+        mu[:, list(drop)] = 0.0
+    e = expert_index(p, mu, signs=signs, omega=omega)
     return np.column_stack([p, mu, e])
+
+
+def corrupt_layer(kind: str, rng: np.random.Generator) -> dict:
+    """Alternative knowledge-failure modes beyond indicator permutation."""
+    signs = np.array([s for _, s, _ in RULES], dtype=float)
+    spec = [(name, list(terms)) for name, terms in PILLAR_SPEC]
+    omega = OMEGA.copy()
+    drop: tuple[int, ...] = ()
+    if kind == "flip_all_signs":
+        signs = -signs
+    elif kind == "flip_three_signs":
+        idx = rng.choice(6, size=3, replace=False)
+        signs[idx] *= -1
+    elif kind == "weight_noise":
+        noisy = []
+        for name, terms in spec:
+            noisy.append(
+                (name, [(j, float(np.clip(w + rng.normal(0.0, 0.25), -1.0, 1.0))) for j, w in terms])
+            )
+        spec = noisy
+        omega = np.abs(omega + rng.normal(0.0, 0.08, size=5))
+        omega = omega / omega.sum()
+    elif kind == "drop_aligned_rules":
+        drop = (0, 1, 2, 4)  # R1, R2, R3, R5 appear in the generator
+    elif kind == "drop_extra_rules":
+        drop = (3, 5)  # R4, R6 have no generator counterpart
+    elif kind != "correct":
+        raise ValueError(kind)
+    return {"spec": spec, "signs": signs, "omega": omega, "drop": drop}
 
 
 def apply_fidelity(x: np.ndarray, phi: float, rng: np.random.Generator) -> np.ndarray:
@@ -260,7 +313,10 @@ def make_lr() -> LogisticRegression:
 
 
 def encode_lr(raw: np.ndarray, scaler: StandardScaler | None = None, fit: bool = False):
-    cont, sector = raw[:, :13], raw[:, 13].astype(int)
+    # Column 13 is sector (0-4). All other columns are continuous, including
+    # optional knowledge features appended after the 14 raw inputs.
+    sector = raw[:, 13].astype(int)
+    cont = np.delete(raw, 13, axis=1)
     oh = np.eye(5)[sector]
     if fit:
         scaler = StandardScaler()
@@ -567,6 +623,7 @@ def explain_one(x_row, log_size, sector, clf) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="Reproduce the KB-DSS study.")
     parser.add_argument("--data", type=Path, default=None, help="Optional real-firm CSV.")
+    parser.add_argument("--misspec-only", action="store_true", help="Run only Table 3 failure-mode sweep.")
     args = parser.parse_args()
     t0 = time.time()
     self_test()
@@ -579,6 +636,55 @@ def main():
         x, log_size, sector, y, _ = generate_benchmark()
         counts = [(y == c).sum() for c in range(3)]
         print(f"Synthetic benchmark: {len(y)} firms, class counts {counts} (target 600/800/600)")
+
+    if args.misspec_only:
+        print("\n=== Table 3 only ===")
+        misspec_kinds = [
+            "correct",
+            "flip_three_signs",
+            "flip_all_signs",
+            "weight_noise",
+            "drop_aligned_rules",
+            "drop_extra_rules",
+        ]
+        misspec_sizes = [60, 240, 1500]
+        table3 = {k: {} for k in misspec_kinds}
+        n_hold = 400
+        for n_tr in misspec_sizes:
+            by_kind = {k: [] for k in misspec_kinds}
+            hgb_scores = []
+            for split in range(12):
+                rng = np.random.default_rng(SEED + 7000 + split)
+                idx = np.arange(len(y))
+                tr_pool, te = train_test_split(idx, test_size=n_hold, stratify=y, random_state=SEED + 50 + split)
+                sub = rng.choice(tr_pool, size=n_tr, replace=False)
+                raw_tr = raw_joint(x[sub], log_size[sub], sector[sub])
+                raw_te = raw_joint(x[te], log_size[te], sector[te])
+                y_tr, y_te = y[sub], y[te]
+                seed = SEED + 11 + split
+                pred_h, _ = fit_predict("hgb", raw_tr, y_tr, raw_te, seed)
+                hgb_f1 = metrics(y_te, pred_h)["macro_f1"]
+                hgb_scores.append(hgb_f1)
+                for kind in misspec_kinds:
+                    layer = corrupt_layer(kind, np.random.default_rng(SEED + 9000 + split * 10 + n_tr))
+                    ft = np.hstack([raw_tr, kappa(x[sub], layer)])
+                    fe = np.hstack([raw_te, kappa(x[te], layer)])
+                    pred, _ = fit_predict("kbdss", ft, y_tr, fe, seed)
+                    by_kind[kind].append(metrics(y_te, pred)["macro_f1"] - hgb_f1)
+            print(f"n={n_tr:4d}  GB {np.mean(hgb_scores):.3f}")
+            for kind in misspec_kinds:
+                g = np.array(by_kind[kind])
+                se = g.std(ddof=1) / np.sqrt(len(g))
+                table3[kind][str(n_tr)] = {
+                    "mean": float(g.mean()),
+                    "lo": float(g.mean() - 1.96 * se),
+                    "hi": float(g.mean() + 1.96 * se),
+                }
+                row = table3[kind][str(n_tr)]
+                print(f"  {kind:22s}  {row['mean']:+.3f} [{row['lo']:+.3f}, {row['hi']:+.3f}]")
+        (OUT / "table3.json").write_text(json.dumps(table3, indent=2))
+        print(f"Wrote {OUT / 'table3.json'} in {time.time() - t0:.1f}s")
+        return
 
     print("\n=== Table 1: 5x3 stratified CV ===")
     cv = run_cv(x, log_size, sector, y)
@@ -654,6 +760,8 @@ def main():
     curve = {k: {"mean": [], "lo": [], "hi": []} for k in ["expert", "lr", "hgb", "kbdss"]}
     curve["sizes"] = sizes
     heat_grid = np.zeros((len(phi_levels), len(sizes)))
+    heat_lo = np.zeros((len(phi_levels), len(sizes)))
+    heat_hi = np.zeros((len(phi_levels), len(sizes)))
     heat_sig = [[False] * len(sizes) for _ in phi_levels]
     n_hold = 400
     for si, n_tr in enumerate(sizes):
@@ -695,8 +803,10 @@ def main():
             curve[key]["hi"].append(float(arr.mean() + 1.96 * se))
         for pi, phi in enumerate(phi_levels):
             g = np.array(gains[phi])
-            heat_grid[pi, si] = float(g.mean())
             se = g.std(ddof=1) / np.sqrt(len(g))
+            heat_grid[pi, si] = float(g.mean())
+            heat_lo[pi, si] = float(g.mean() - 1.96 * se)
+            heat_hi[pi, si] = float(g.mean() + 1.96 * se)
             heat_sig[pi][si] = abs(g.mean()) > 1.96 * se
         print(
             f"n={n_tr:4d}  expert {curve['expert']['mean'][-1]:.3f}  "
@@ -743,7 +853,14 @@ def main():
         "table1": table1,
         "table2": table2,
         "learning_curve": curve,
-        "fidelity": {"phi": phi_levels, "sizes": sizes, "grid": heat_grid.tolist(), "sig": heat_sig},
+        "fidelity": {
+            "phi": phi_levels,
+            "sizes": sizes,
+            "grid": heat_grid.tolist(),
+            "lo": heat_lo.tolist(),
+            "hi": heat_hi.tolist(),
+            "sig": heat_sig,
+        },
         "permutation_importance": {
             "names": imp_names,
             "values": [float(v) for v in imp_vals],
